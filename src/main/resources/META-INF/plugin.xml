@@ -1,0 +1,17 @@
+<!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
+<idea-plugin>
+    <id>com.pagewiser.idea.sentry</id>
+    <name>IntelliJ Platform Plugin Template</name>
+    <vendor>Pagewiser</vendor>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <resource-bundle>messages.MyBundle</resource-bundle>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow factoryClass="com.pagewiser.idea.sentry.toolWindow.MyToolWindowFactory" id="MyToolWindow"/>
+        <postStartupActivity implementation="com.pagewiser.idea.sentry.startup.MyProjectActivity" />
+        <applicationConfigurable instance="com.pagewiser.idea.sentry.SentrySettingsConfigurable" displayName="Sentry Integration"/>
+        <applicationService serviceImplementation="com.pagewiser.idea.sentry.SentrySettingsState" />
+    </extensions>
+</idea-plugin>
