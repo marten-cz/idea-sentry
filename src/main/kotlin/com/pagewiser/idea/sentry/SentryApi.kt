@@ -88,11 +88,10 @@ object SentryApi {
         val normalized = filePath.replace('\\', '/').trim('/')
         val srcIdx = normalized.indexOf("/src/")
         if (srcIdx >= 0) {
-            return normalized.substring(srcIdx + 1) // keep from 'src/...'
+            return normalized.substring(srcIdx + 1)
         }
         val parts = normalized.split('/')
-        val tail = parts.takeLast(3).joinToString("/")
-        return tail
+        return parts.takeLast(3).joinToString("/")
     }
 
     fun findFindingsForFile(token: String, projectSlug: String, filePath: String): List<SentryFinding> {
@@ -220,7 +219,7 @@ object SentryApi {
             SentryDebugLog.log("Failed to parse Discover response: ${e.message}")
         }
 
-        // Enrich with issue details (firstSeen/lastSeen/total count when available)
+        // Enrich per-issue details
         for ((issueId, existing) in byIssue.toMap()) {
             val issueUrl = "https://sentry.io/api/0/issues/$issueId/"
             val issueBody = makeRequest(token, issueUrl) ?: continue
@@ -238,5 +237,105 @@ object SentryApi {
         val findings = byIssue.values.toList()
         SentryDebugLog.log("findFindingsForFile (Discover+issue) returned ${findings.size} unique findings")
         return findings
+    }
+
+    fun findAllIssues(token: String, projectSlug: String): List<SentryFinding> {
+        if (token.isBlank() || projectSlug.isBlank()) return emptyList()
+        val orgSlug = getOrgSlugForProject(token, projectSlug) ?: return emptyList()
+        val projectId = getProjectIdForSlug(token, projectSlug) ?: return emptyList()
+
+        val fields = listOf(
+            "issue.id",
+            "title",
+            "stack.filename",
+            "stack.lineno",
+            "level",
+            "error.handled",
+            "timestamp",
+            "count()",
+            "release"
+        ).joinToString("&") { f -> "field=" + URLEncoder.encode(f, Charsets.UTF_8.name()) }
+        val url = "https://sentry.io/api/0/organizations/$orgSlug/events/?project=$projectId&$fields&per_page=50&referrer=ide-plugin"
+        SentryDebugLog.log("Discover query (all issues) for project=$projectId")
+        val body = makeRequest(token, url) ?: return emptyList()
+
+        val byIssue = linkedMapOf<String, SentryFinding>()
+        try {
+            val obj = JSONObject(body)
+            val data = obj.optJSONArray("data") ?: JSONArray()
+            for (i in 0 until data.length()) {
+                val row = data.getJSONObject(i)
+                val issueId = row.optString("issue.id", "")
+                if (issueId.isEmpty()) continue
+
+                val fileField = row.opt("stack.filename")
+                val rowPrimaryFile = when (fileField) {
+                    is JSONArray -> if (fileField.length() > 0) fileField.optString(0, "") else ""
+                    is String -> fileField.substringBefore(',')
+                    else -> ""
+                }.replace('\\', '/').trim()
+
+                val title = row.optString("title", "Unknown error")
+                val linenoField = row.opt("stack.lineno")
+                val line = when (linenoField) {
+                    is JSONArray -> linenoField.optInt(0, 0)
+                    is Number -> linenoField.toInt()
+                    is String -> linenoField.toIntOrNull() ?: 0
+                    else -> 0
+                }
+                val level = row.optString("level", "error")
+                val handled = row.opt("error.handled")
+                val unhandled = when (handled) {
+                    is Boolean -> !handled
+                    is Number -> handled.toInt() == 0
+                    is String -> handled.equals("false", true) || handled == "0"
+                    else -> false
+                }
+                val lastSeen = row.optString("timestamp", null)
+                val firstSeen: String? = null
+                val count = when (val c = row.opt("count")) {
+                    is Number -> c.toInt()
+                    is String -> c.toIntOrNull() ?: 0
+                    else -> when (val c2 = row.opt("count()")) {
+                        is Number -> c2.toInt()
+                        is String -> c2.toIntOrNull() ?: 0
+                        else -> 0
+                    }
+                }
+                val release = row.optString("release", null)
+                val urlIssue = "https://sentry.io/organizations/$orgSlug/issues/$issueId/"
+                val desc = rowPrimaryFile
+
+                val existing = byIssue[issueId]
+                if (existing == null) {
+                    byIssue[issueId] = SentryFinding(
+                        issueId = issueId,
+                        title = title,
+                        lineNumber = line,
+                        issueUrl = urlIssue,
+                        level = level,
+                        description = desc,
+                        latestRelease = release,
+                        unhandled = unhandled,
+                        lastSeen = lastSeen,
+                        firstSeen = firstSeen,
+                        occurrences = count
+                    )
+                } else {
+                    val betterLine = if (existing.lineNumber > 0) existing.lineNumber else line
+                    val betterCount = maxOf(existing.occurrences, count)
+                    val betterLast = existing.lastSeen ?: lastSeen
+                    byIssue[issueId] = existing.copy(
+                        lineNumber = betterLine,
+                        occurrences = betterCount,
+                        lastSeen = betterLast
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            SentryDebugLog.log("Failed to parse Discover response (all issues): ${e.message}")
+        }
+
+        return byIssue.values.toList()
     }
 }
