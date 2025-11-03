@@ -9,6 +9,7 @@ plugins {
     alias(libs.plugins.changelog) // Gradle Changelog Plugin
     alias(libs.plugins.qodana) // Gradle Qodana Plugin
     alias(libs.plugins.kover) // Gradle Kover Plugin
+    id("org.sonarqube") version "7.0.1.6134"
 }
 
 group = "com.pagewiser.idea.sentry"
@@ -114,6 +115,13 @@ intellijPlatform {
 changelog {
     groups.empty()
     repositoryUrl = providers.gradleProperty("pluginRepositoryUrl")
+}
+
+sonar {
+    properties {
+        property("sonar.projectKey", "marten-cz_idea-sentry")
+        property("sonar.organization", "marten-cz")
+    }
 }
 
 // Configure Gradle Kover Plugin - read more: https://github.com/Kotlin/kotlinx-kover#configuration
