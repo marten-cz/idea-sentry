@@ -9,9 +9,9 @@
     <resource-bundle>messages.MyBundle</resource-bundle>
 
     <extensions defaultExtensionNs="com.intellij">
-        <toolWindow factoryClass="com.pagewiser.idea.sentry.toolWindow.MyToolWindowFactory" id="MyToolWindow"/>
+        <toolWindow factoryClass="com.pagewiser.idea.sentry.toolWindow.MyToolWindowFactory" id="SentryIssues" anchor="bottom" displayName="Sentry Issues"/>
         <postStartupActivity implementation="com.pagewiser.idea.sentry.startup.MyProjectActivity" />
-        <applicationConfigurable instance="com.pagewiser.idea.sentry.SentrySettingsConfigurable" displayName="Sentry Integration"/>
+        <applicationConfigurable id="com.pagewiser.idea.sentry.settings" parentId="tools" instance="com.pagewiser.idea.sentry.SentrySettingsConfigurable" displayName="Sentry Integration"/>
         <applicationService serviceImplementation="com.pagewiser.idea.sentry.SentrySettingsState" />
     </extensions>
 </idea-plugin>

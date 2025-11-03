@@ -620,3 +620,79 @@ That approach gives more possibilities for testing and debugging pre-releases, f
 [keep-a-changelog-how]: https://keepachangelog.com/en/1.0.0/#how
 [semver]: https://semver.org
 [xpath]: https://www.w3.org/TR/xpath-21/
+
+# Sentry Issues (IntelliJ IDEA Plugin)
+
+Sentry Issues highlights Sentry-reported problems directly in your editor and provides a dedicated tool window with a searchable list of issues for the currently open file.
+
+## Build & Run
+
+- Run the sandbox IDE:
+
+```bash
+./gradlew intellijPlatformRunIde
+```
+
+- Build a distributable zip:
+
+```bash
+./gradlew buildPlugin
+```
+
+## Configuration
+
+Open Settings / Preferences and go to:
+
+- Tools → Sentry Integration
+
+Configure:
+
+- API Token: Your Sentry API token (Bearer) with permission to read projects/issues.
+- Project: Click the refresh button (↻) to fetch available projects; select your target project.
+- Sentry relative path prefix (optional): If your Sentry stack filenames are prefixed (e.g. `../../repo/subdir`), set that prefix here. The plugin will prefix your project-relative path with this value when querying Sentry, improving filename matching.
+- Enable Sentry integration: Toggle to enable/disable all functionality.
+
+Click Apply/OK to save.
+
+## Usage
+
+- Open a source file in the editor.
+- The plugin queries Sentry for issues matching this file and shows them in the bottom tool window named “Sentry Issues”.
+- The tool window button displays a red numeric badge with the number of findings for the current file.
+- Each finding row shows:
+  - Colored severity dot (error, warning, info)
+  - Title and description
+  - Footer: latest release, Unhandled marker (if applicable), first/last seen, and occurrence count
+- Interactions:
+  - Single-click a finding: jumps to the corresponding line in the editor
+  - Double-click a finding: opens the Sentry issue in your browser
+  - In the editor gutter: a red bug icon marks the exact line; hover for details; click to open Sentry
+
+## Filename Mapping Notes
+
+Sentry stack frames often use relative paths like `../../src/...`.
+
+The plugin derives a project-relative path for the open file and queries Sentry using both:
+
+- `stack.filename:*/<project-relative-path>`
+- `stack.filename:*<prefix>/<project-relative-path>` when a prefix is configured
+
+Additionally, only the primary (top) frame is considered when matching results to the open file, and only results with a positive line number are used for editor gutter markers.
+
+## Troubleshooting
+
+- No results in tool window:
+  - Verify API token and selected project in Tools → Sentry Integration
+  - Try setting a “Sentry relative path prefix” that matches how paths appear in Sentry (e.g. `../../repo`)
+  - Open the tool window and click the bug button to show the debug log; it prints the exact Discover queries and why rows were skipped
+- Gutter icon not visible:
+  - Ensure the result includes a valid line number (`stack.lineno > 0`)
+  - Check the debug log for filename mismatches
+
+## Privacy & Scope
+
+- The API token and settings are stored locally using IntelliJ’s persistent storage. No data is uploaded anywhere except direct Sentry API calls made by the plugin.
+
+## License
+
+See LICENSE.

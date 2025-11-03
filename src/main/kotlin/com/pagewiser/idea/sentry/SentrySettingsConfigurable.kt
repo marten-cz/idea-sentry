@@ -1,21 +1,16 @@
 package com.pagewiser.idea.sentry
 
 import com.intellij.openapi.options.Configurable
-import javax.swing.JPanel
-import javax.swing.JTextField
-import javax.swing.JLabel
-import javax.swing.BoxLayout
-import javax.swing.BorderFactory
-import java.awt.Dimension
-import java.awt.FlowLayout
 import javax.swing.*
 import java.awt.Component
+import javax.swing.event.DocumentEvent
+import javax.swing.event.DocumentListener
 
 class SentrySettingsConfigurable : Configurable {
     private val enableIntegration = JCheckBox("Enable Sentry integration")
     private val tokenField = JTextField(30).apply {
         toolTipText = "Enter your Sentry API token"
-        maximumSize = java.awt.Dimension(Short.MAX_VALUE.toInt(), 28) // Make it fill horizontally
+        maximumSize = java.awt.Dimension(Short.MAX_VALUE.toInt(), 28)
         alignmentX = Component.LEFT_ALIGNMENT
     }
     private val projectCombo = JComboBox<String>().apply {
@@ -28,9 +23,13 @@ class SentrySettingsConfigurable : Configurable {
         preferredSize = java.awt.Dimension(45, 28)
         alignmentY = Component.CENTER_ALIGNMENT
     }
+    private val sentryPrefixField = JTextField(30).apply {
+        toolTipText = "Optional: prefix to match Sentry relative paths (e.g. ../../repo/subdir)"
+        maximumSize = java.awt.Dimension(Short.MAX_VALUE.toInt(), 28)
+        alignmentX = Component.LEFT_ALIGNMENT
+    }
     private var settingsPanel: JPanel? = null
 
-    // Helper to (re)populate project combo
     private fun updateProjectCombo(projects: List<String>, selected: String?) {
         projectCombo.removeAllItems()
         projects.forEach { projectCombo.addItem(it) }
@@ -63,13 +62,17 @@ class SentrySettingsConfigurable : Configurable {
             val projectLabel = JLabel("Project:").apply { alignmentX = Component.LEFT_ALIGNMENT }
             panel.add(projectLabel)
 
-            // Horizontal panel for combo + refresh (filled under vertical stacking)
             val projectRow = Box.createHorizontalBox()
             projectRow.add(projectCombo)
             projectRow.add(Box.createRigidArea(java.awt.Dimension(6, 0)))
             projectRow.add(refreshBtn)
             projectRow.alignmentX = Component.LEFT_ALIGNMENT
             panel.add(projectRow)
+            panel.add(Box.createRigidArea(java.awt.Dimension(0, 8)))
+
+            val prefixLabel = JLabel("Sentry relative path prefix:").apply { alignmentX = Component.LEFT_ALIGNMENT }
+            panel.add(prefixLabel)
+            panel.add(sentryPrefixField)
 
             settingsPanel = panel
 
@@ -77,12 +80,22 @@ class SentrySettingsConfigurable : Configurable {
             enableIntegration.isSelected = settings.enabled
             tokenField.text = settings.apiToken
             updateProjectCombo(settings.knownProjects, settings.selectedProject)
+            sentryPrefixField.text = settings.sentryPathPrefix
             setControlsEnabled(settings.enabled)
 
             enableIntegration.addActionListener {
                 setControlsEnabled(enableIntegration.isSelected)
+                settingsPanel?.revalidate(); settingsPanel?.repaint()
             }
-            // --- REFRESH BUTTON LOGIC ---
+            val dirtyDocListener = object : DocumentListener {
+                override fun insertUpdate(e: DocumentEvent?) { settingsPanel?.revalidate(); settingsPanel?.repaint() }
+                override fun removeUpdate(e: DocumentEvent?) { settingsPanel?.revalidate(); settingsPanel?.repaint() }
+                override fun changedUpdate(e: DocumentEvent?) { settingsPanel?.revalidate(); settingsPanel?.repaint() }
+            }
+            tokenField.document.addDocumentListener(dirtyDocListener)
+            sentryPrefixField.document.addDocumentListener(dirtyDocListener)
+            projectCombo.addActionListener { settingsPanel?.revalidate(); settingsPanel?.repaint() }
+
             refreshBtn.addActionListener {
                 val token = tokenField.text.trim()
                 if (token.isNotEmpty()) {
@@ -104,6 +117,7 @@ class SentrySettingsConfigurable : Configurable {
                             }
                             projectCombo.isEnabled = true
                             refreshBtn.isEnabled = true
+                            settingsPanel?.revalidate(); settingsPanel?.repaint()
                         }
                     }.start()
                 } else {
@@ -120,6 +134,7 @@ class SentrySettingsConfigurable : Configurable {
         tokenField.isEnabled = enabled
         projectCombo.isEnabled = enabled
         refreshBtn.isEnabled = enabled
+        sentryPrefixField.isEnabled = enabled
     }
 
     override fun isModified(): Boolean {
@@ -128,6 +143,7 @@ class SentrySettingsConfigurable : Configurable {
                 || settings.apiToken != tokenField.text.trim()
                 || settings.selectedProject != (projectCombo.selectedItem as? String ?: "")
                 || settings.knownProjects != (0 until projectCombo.itemCount).map { i -> projectCombo.getItemAt(i) }
+                || settings.sentryPathPrefix != sentryPrefixField.text.trim()
     }
 
     override fun apply() {
@@ -136,6 +152,7 @@ class SentrySettingsConfigurable : Configurable {
         settings.apiToken = tokenField.text.trim()
         settings.selectedProject = projectCombo.selectedItem as? String ?: ""
         settings.knownProjects = (0 until projectCombo.itemCount).map { i -> projectCombo.getItemAt(i) }
+        settings.sentryPathPrefix = sentryPrefixField.text.trim()
     }
 
     override fun reset() {
@@ -143,6 +160,7 @@ class SentrySettingsConfigurable : Configurable {
         enableIntegration.isSelected = settings.enabled
         tokenField.text = settings.apiToken
         updateProjectCombo(settings.knownProjects, settings.selectedProject)
+        sentryPrefixField.text = settings.sentryPathPrefix
         setControlsEnabled(settings.enabled)
     }
 

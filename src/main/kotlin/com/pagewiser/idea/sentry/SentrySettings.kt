@@ -6,5 +6,6 @@ data class SentrySettings(
     var enabled: Boolean = true,
     var apiToken: String = "",
     var selectedProject: String = "",
-    var knownProjects: List<String> = listOf()
+    var knownProjects: List<String> = listOf(),
+    var sentryPathPrefix: String = ""
 )
