@@ -106,7 +106,6 @@ intellijPlatform {
 
     pluginVerification {
         ides {
-            ide("IC-2024.3.4")   // 243.x stable line (example)
             ide("IC-2025.1.5")   // matches your platformVersion
         }
     }
